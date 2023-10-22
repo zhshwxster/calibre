@@ -48,7 +48,7 @@ from calibre.utils.date import EPOCH, parse_date, utcfromtimestamp, utcnow
 from calibre.utils.filenames import (
     ascii_filename, atomic_rename, copyfile_using_links, copytree_using_links,
     hardlink_file, is_case_sensitive, is_fat_filesystem, make_long_path_useable,
-    remove_dir_if_empty, samefile, get_long_path_name
+    remove_dir_if_empty, samefile, get_long_path_name, safe_filename
 )
 from calibre.utils.formatter_functions import (
     compile_user_template_functions, formatter_functions, load_user_template_functions,
@@ -1357,8 +1357,10 @@ class DB:
         '''
         book_id = BOOK_ID_PATH_TEMPLATE.format(book_id)
         l = self.PATH_LIMIT - (len(book_id) // 2) - 2
-        author = ascii_filename(author)[:l]
-        title  = ascii_filename(title.lstrip())[:l].rstrip()
+        author = safe_filename(author)[:l]
+        title  = safe_filename(title.lstrip())[:l].rstrip()
+        #author = ascii_filename(author)[:l]
+        #title  = ascii_filename(title.lstrip())[:l].rstrip()
         if not title:
             title = 'Unknown'[:l]
         try:
@@ -1384,8 +1386,10 @@ class DB:
         l = (self.PATH_LIMIT - (extlen // 2) - 2) if iswindows else ((self.PATH_LIMIT - extlen - 2) // 2)
         if l < 5:
             raise ValueError('Extension length too long: %d' % extlen)
-        author = ascii_filename(author)[:l]
-        title  = ascii_filename(title.lstrip())[:l].rstrip()
+        author = safe_filename(author)[:l]
+        title  = safe_filename(title.lstrip())[:l].rstrip()
+        #author = ascii_filename(author)[:l]
+        #title  = ascii_filename(title.lstrip())[:l].rstrip()
         if not title:
             title = 'Unknown'[:l]
         name   = title + ' - ' + author
@@ -1707,7 +1711,7 @@ class DB:
                         # Ensure that the file has the same case as dest
                         try:
                             os.rename(path, dest)
-                        except OSError:
+                        except:
                             pass  # Nothing too catastrophic happened, the cases mismatch, that's all
                 else:
                     if use_hardlink:
@@ -1716,7 +1720,7 @@ class DB:
                             return True
                         except:
                             pass
-                    with open(path, 'rb') as f, open(make_long_path_useable(dest), 'wb') as d:
+                    with open(path, 'rb') as f, open(dest, 'wb') as d:
                         shutil.copyfileobj(f, d)
         return True
 
@@ -2040,14 +2044,13 @@ class DB:
         for base in ('b', 'f'):
             base = os.path.join(self.trash_dir, base)
             for x in os.scandir(base):
-                if x.is_dir(follow_symlinks=False):
-                    try:
-                        st = x.stat(follow_symlinks=False)
-                        mtime = st.st_mtime
-                    except OSError:
-                        mtime = 0
-                    if mtime + expire_age_in_seconds <= now or expire_age_in_seconds <= 0:
-                        removals.append(x.path)
+                try:
+                    st = x.stat(follow_symlinks=False)
+                    mtime = st.st_mtime
+                except OSError:
+                    mtime = 0
+                if mtime + expire_age_in_seconds <= now or expire_age_in_seconds <= 0:
+                    removals.append(x.path)
         for x in removals:
             try:
                 rmtree_with_retry(x)

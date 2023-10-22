@@ -7,6 +7,7 @@ import errno
 import os
 import shutil
 import time
+import re
 from contextlib import closing, suppress
 from math import ceil
 
@@ -38,6 +39,11 @@ def ascii_filename(orig, substitute='_'):
     ans = ''.join(x if ord(x) >= 32 else substitute for x in orig)
     return sanitize_file_name(ans, substitute=substitute)
 
+def safe_filename(orig, substitute='_'):
+    if isinstance(substitute, bytes):
+        substitute = substitute.decode(filesystem_encoding)
+    ans = re.sub(r"[\/\\\:\*\?\"\<\>\| ]", "_", orig)
+    return sanitize_file_name(ans, substitute=substitute)
 
 def shorten_component(s, by_what):
     l = len(s)
@@ -442,7 +448,6 @@ class WindowsAtomicFolderMove:
 
 
 def hardlink_file(src, dest):
-    src, dest = make_long_path_useable(src), make_long_path_useable(dest)
     if iswindows:
         windows_hardlink(src, dest)
         return
